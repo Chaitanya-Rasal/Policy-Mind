@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal/Policy Document Summarizer & Q&A</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📄 Legal/Policy Document Summarizer & Q&A</h1>
+            <p class="subtitle">Upload documents, get AI-powered summaries, and ask questions</p>
+        </header>
+
+        <div class="section upload-section">
+            <h2>1. Upload Document</h2>
+            <p class="section-description">Upload a legal or policy document (PDF or DOCX)</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <p>Click to select a file or drag and drop</p>
+                <input type="file" id="fileInput" accept=".pdf,.docx" hidden>
+                <button class="btn btn-primary" id="selectFileBtn">Select File</button>
+            </div>
+            
+            <div id="fileInfo" class="file-info" style="display: none;">
+                <p><strong>Selected:</strong> <span id="fileName"></span></p>
+                <button class="btn btn-success" id="uploadBtn">Upload & Process</button>
+            </div>
+            
+            <div id="uploadStatus" class="status-message" style="display: none;"></div>
+            <div class="loader" id="uploadLoader" style="display: none;"></div>
+        </div>
+
+        <div class="section summary-section" id="summarySection" style="display: none;">
+            <h2>2. Document Summary</h2>
+            <p class="section-description">Generate an AI-powered summary of your document</p>
+            
+            <button class="btn btn-primary" id="generateSummaryBtn" style="margin-bottom: 15px;">Generate Summary</button>
+            
+            <div id="summaryContent" class="content-box">
+                <p class="placeholder">Click "Generate Summary" to get an AI-powered summary of your document</p>
+            </div>
+            
+            <div class="loader" id="summaryLoader" style="display: none;"></div>
+        </div>
+
+        <div class="section qa-section">
+            <h2>3. Ask Questions</h2>
+            <p class="section-description">Ask questions about the uploaded document</p>
+            
+            <div class="qa-input-area">
+                <textarea 
+                    id="questionInput" 
+                    placeholder="E.g., What are the key obligations in this contract? What are the penalties for non-compliance?"
+                    rows="3"
+                ></textarea>
+                <button class="btn btn-primary" id="askBtn">Ask Question</button>
+            </div>
+            
+            <div class="loader" id="qaLoader" style="display: none;"></div>
+            
+            <div id="qaResults" class="qa-results"></div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

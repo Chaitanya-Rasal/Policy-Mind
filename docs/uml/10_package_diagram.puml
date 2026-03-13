@@ -1,0 +1,134 @@
+
+@startuml Package Diagram
+!theme plain
+
+package "Frontend" {
+  package "static" {
+    package "css" {
+      [style.css]
+    }
+    package "js" {
+      [app.js]
+    }
+    [index.html]
+  }
+}
+
+package "Backend" {
+  package "modules" {
+    [config.py]
+    [document_processor.py]
+    [ai_service.py]
+    [embedding_service.py]
+    
+    note right of [config.py]
+      Configuration management
+      Environment variables
+      Constants
+    end note
+    
+    note right of [document_processor.py]
+      Text extraction (PDF/DOCX)
+      Chunking logic
+    end note
+    
+    note right of [ai_service.py]
+      Google AI integration
+      Singleton pattern
+      Embedding & generation
+    end note
+    
+    note right of [embedding_service.py]
+      FAISS management
+      Vector operations
+      Persistence
+    end note
+  }
+  
+  package "routes" {
+    [upload_routes.py]
+    [document_routes.py]
+    [qa_routes.py]
+    
+    note right of [upload_routes.py]
+      POST /upload
+      Document state management
+    end note
+    
+    note right of [document_routes.py]
+      POST /summarize
+      GET /status
+    end note
+    
+    note right of [qa_routes.py]
+      POST /ask
+      RAG implementation
+    end note
+  }
+  
+  package "utils" {
+    [validators.py]
+    
+    note right of [validators.py]
+      Input validation
+      File type checking
+      Content validation
+    end note
+  }
+  
+  [app.py]
+}
+
+package "Data Storage" {
+  folder "data/uploads" as Uploads
+  folder "data/faiss_indexes" as FAISS
+  
+  note right of Uploads
+    Temporary file storage
+    Secure filenames
+  end note
+  
+  note right of FAISS
+    index.faiss
+    chunks.pkl
+  end note
+}
+
+package "Documentation" {
+  [PROJECT.md]
+  [MODULES.md]
+  [replit.md]
+  
+  folder "docs/uml" {
+    [01_use_case_diagram.puml]
+    [02_class_diagram.puml]
+    [03_sequence_upload.puml]
+    [04_sequence_summarize.puml]
+    [05_sequence_qa.puml]
+    [06_activity_diagram.puml]
+    [07_component_diagram.puml]
+    [08_deployment_diagram.puml]
+    [09_state_diagram.puml]
+    [10_package_diagram.puml]
+    [11_erd_diagram.puml]
+  }
+}
+
+[app.py] --> modules : imports
+[app.py] --> routes : registers blueprints
+
+routes --> modules : uses
+routes --> utils : uses
+
+modules ..> "Data Storage" : reads/writes
+
+[static] ..> routes : HTTP API calls
+
+note right of "Documentation"
+  Comprehensive documentation
+  - Project overview
+  - Module details
+  - UML diagrams
+end note
+
+@enduml

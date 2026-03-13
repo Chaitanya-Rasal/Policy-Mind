@@ -1,0 +1,114 @@
+
+@startuml Question Answering Sequence
+!theme plain
+
+actor User
+participant "Frontend\n(app.js)" as Frontend
+participant "QA Route" as QA
+participant "FileValidator" as Validator
+participant "EmbeddingService" as Embedding
+participant "AIService" as AI
+participant "FAISS Index" as FAISS
+database "Google AI API" as GoogleAPI
+
+User -> Frontend: Type question
+User -> Frontend: Click "Ask Question"\nor Ctrl+Enter
+activate Frontend
+
+Frontend -> QA: POST /ask\n{question}
+activate QA
+
+QA -> QA: get_current_document()
+QA -> QA: Check document loaded
+
+alt No document
+  QA --> Frontend: 400 Error
+  Frontend --> User: "Upload document first"
+else Document exists
+  QA -> AI: is_initialized()
+  activate AI
+  AI --> QA: true
+  deactivate AI
+
+  QA -> Validator: validate_question(question)
+  activate Validator
+  Validator -> Validator: Check not empty
+  Validator --> QA: true/raises ValueError
+  deactivate Validator
+
+  alt Invalid question
+    QA --> Frontend: 400 Error
+    Frontend --> User: Validation error
+  else Valid question
+    QA -> Embedding: search_similar_chunks(question, 5)
+    activate Embedding
+    
+    Embedding -> AI: generate_embedding(question)
+    activate AI
+    AI -> GoogleAPI: embed_content(question)
+    activate GoogleAPI
+    GoogleAPI --> AI: query_embedding[]
+    deactivate GoogleAPI
+    AI --> Embedding: query_vector
+    deactivate AI
+    
+    Embedding -> Embedding: Convert to numpy array
+    Embedding -> FAISS: search(query_vector, k=5)
+    activate FAISS
+    FAISS -> FAISS: Calculate L2 distances
+    FAISS --> Embedding: indices of top 5 chunks
+    deactivate FAISS
+    
+    Embedding -> Embedding: Retrieve chunk texts\nby indices
+    Embedding --> QA: relevant_chunks[]
+    deactivate Embedding
+
+    alt No chunks found
+      QA --> Frontend: 404 Error
+      Frontend --> User: "No relevant info found"
+    else Chunks retrieved
+      QA -> QA: Concatenate chunks\ninto context
+      
+      QA -> AI: answer_question(question, context)
+      activate AI
+      
+      note right of AI
+        Prompt includes:
+        - Role definition
+        - Context from top 5 chunks
+        - User's question
+        - Instructions to cite sources
+      end note
+      
+      AI -> GoogleAPI: generate_content(prompt)
+      activate GoogleAPI
+      GoogleAPI -> GoogleAPI: Process with\nGemini 2.5 Flash
+      GoogleAPI --> AI: answer_text
+      deactivate GoogleAPI
+      
+      AI --> QA: answer
+      deactivate AI
+      
+      QA --> Frontend: 200 Success\n{answer, question,\ndocument, chunks_used: 5}
+      deactivate QA
+      
+      Frontend -> Frontend: Create Q&A item
+      Frontend -> Frontend: Prepend to results
+      Frontend --> User: Display answer\nwith metadata
+    end
+  end
+end
+
+deactivate Frontend
+
+note over User, GoogleAPI
+  Q&A uses RAG (Retrieval-Augmented Generation):
+  1. Embed question → vector
+  2. Search FAISS for similar chunks
+  3. Retrieve top 5 most relevant
+  4. Generate answer with context
+  
+  Response time: ~2-4 seconds
+end note
+
+@enduml

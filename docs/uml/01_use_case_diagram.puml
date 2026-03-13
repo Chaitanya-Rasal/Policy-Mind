@@ -1,0 +1,67 @@
+
+@startuml Use Case Diagram
+!theme plain
+skinparam actorStyle awesome
+
+left to right direction
+
+actor User as user
+
+rectangle "Legal/Policy Document Summarizer & Q&A System" {
+  usecase (Upload Document) as UC1
+  usecase (Validate File Type) as UC2
+  usecase (Extract Text) as UC3
+  usecase (Generate Chunks) as UC4
+  usecase (Create Embeddings) as UC5
+  usecase (Build FAISS Index) as UC6
+  usecase (Generate Summary) as UC7
+  usecase (Ask Question) as UC8
+  usecase (Search Similar Chunks) as UC9
+  usecase (Generate Answer) as UC10
+  usecase (Check Document Status) as UC11
+}
+
+actor "Google AI API" as gemini
+
+user --> UC1
+user --> UC7
+user --> UC8
+user --> UC11
+
+UC1 ..> UC2 : <<include>>
+UC1 ..> UC3 : <<include>>
+UC1 ..> UC4 : <<include>>
+UC1 ..> UC5 : <<include>>
+UC1 ..> UC6 : <<include>>
+
+UC7 --> gemini : uses
+UC8 ..> UC9 : <<include>>
+UC8 ..> UC10 : <<include>>
+UC10 --> gemini : uses
+UC5 --> gemini : uses
+
+note right of UC1
+  Supports PDF and DOCX
+  Max size: 16MB
+  Validates file extension
+end note
+
+note right of UC7
+  Optional - triggered by button
+  Uses Gemini 2.5 Flash
+  Max text: 15,000 chars
+end note
+
+note right of UC8
+  Uses RAG approach
+  Retrieves top 5 chunks
+  Context-based answers
+end note
+
+note bottom of gemini
+  Models Used:
+  - gemini-2.5-flash (chat)
+  - text-embedding-004 (embeddings)
+end note
+
+@enduml

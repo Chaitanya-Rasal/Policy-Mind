@@ -1,0 +1,83 @@
+
+@startuml Deployment Diagram
+!theme plain
+
+node "User's Browser" {
+  component [HTML/CSS/JS\nFrontend] as Frontend
+}
+
+node "Replit Environment" {
+  node "Flask Server\n(0.0.0.0:5000)" {
+    component [app.py] as App
+    component [Routes Layer] as Routes
+    component [Modules Layer] as Modules
+    component [Utils Layer] as Utils
+    
+    App --> Routes
+    Routes --> Modules
+    Routes --> Utils
+  }
+  
+  node "File System" {
+    folder "data/uploads/" as Uploads
+    folder "data/faiss_indexes/" as FAISSDir
+    
+    database "index.faiss" as FAISSIndex
+    database "chunks.pkl" as Chunks
+    
+    FAISSDir --> FAISSIndex
+    FAISSDir --> Chunks
+  }
+  
+  note right of Uploads
+    Temporary storage
+    Cleaned periodically
+  end note
+  
+  note right of FAISSDir
+    Persistent vector store
+    Survives restarts
+  end note
+}
+
+cloud "Google Cloud" {
+  node "Google AI Services" {
+    component [Gemini 2.5 Flash\nAPI] as Gemini
+    component [Text Embedding\nAPI] as Embedding
+  }
+}
+
+Frontend -down-> App : HTTP/HTTPS\n(Port 5000)
+
+Modules -right-> Gemini : API Calls\n(Summary, Q&A)
+Modules -right-> Embedding : API Calls\n(Vector generation)
+
+Modules -down-> FAISSIndex : Read/Write\n(Vector search)
+Modules -down-> Chunks : Read/Write\n(Chunk storage)
+Routes -down-> Uploads : Save uploaded files
+
+note bottom of "Replit Environment"
+  Runtime: Python 3.11+
+  Package Manager: uv
+  Dependencies:
+  - Flask 3.1.2
+  - google-generativeai 0.8.5
+  - faiss-cpu 1.12.0
+  - pdfplumber 0.11.8
+  - python-docx 1.2.0
+end note
+
+note top of Frontend
+  Modern browser required
+  JavaScript enabled
+  Drag-and-drop support
+end note
+
+note right of "Google AI Services"
+  Authentication: API Key
+  Rate Limits:
+  - Free tier: 2 req/min
+  - Quota monitoring needed
+end note
+
+@enduml

@@ -1,0 +1,142 @@
+
+@startuml Class Diagram
+!theme plain
+
+package "Backend Modules" {
+  class Config {
+    + {static} UPLOAD_FOLDER: str
+    + {static} FAISS_FOLDER: str
+    + {static} ALLOWED_EXTENSIONS: set
+    + {static} MAX_CONTENT_LENGTH: int
+    + {static} MAX_TEXT_LENGTH: int
+    + {static} CHUNK_MAX_WORDS: int
+    + {static} TOP_K_CHUNKS: int
+    + {static} GOOGLE_API_KEY: str
+    + {static} GEMINI_MODEL: str
+    + {static} EMBEDDING_MODEL: str
+    + {static} DEBUG: bool
+    + {static} HOST: str
+    + {static} PORT: int
+    --
+    + {static} ensure_directories(): void
+    + {static} validate_api_key(): bool
+  }
+
+  class DocumentProcessor {
+    + {static} extract_text_from_pdf(file_path: str): str
+    + {static} extract_text_from_docx(file_path: str): str
+    + {static} extract_text(file_path: str, file_extension: str): str
+    + {static} count_words(text: str): int
+    + {static} chunk_text(text: str, max_words: int): list[str]
+  }
+
+  class AIService {
+    - {static} _model: GenerativeModel
+    - {static} _embed_model: str
+    - {static} _initialized: bool
+    --
+    + {static} initialize(): bool
+    + {static} get_model(): GenerativeModel
+    + {static} get_embedding_model(): str
+    + {static} is_initialized(): bool
+    + {static} generate_embedding(text: str): list[float]
+    + {static} generate_summary(text: str): str
+    + {static} answer_question(question: str, context: str): str
+  }
+
+  class EmbeddingService {
+    - faiss_index: faiss.Index
+    - chunk_texts: list[str]
+    --
+    + __init__()
+    + create_faiss_index(chunks: list[str]): faiss.Index
+    + search_similar_chunks(query: str, top_k: int): list[str]
+    - _save_index(): void
+    + load_index(): bool
+    + clear_index(): void
+  }
+}
+
+package "Backend Utils" {
+  class FileValidator {
+    + {static} allowed_file(filename: str): bool
+    + {static} validate_text_content(text: str): bool
+    + {static} validate_chunks(chunks: list): bool
+    + {static} validate_question(question: str): bool
+  }
+}
+
+package "Backend Routes" {
+  class UploadRoutes {
+    - current_document: dict
+    - embedding_service: EmbeddingService
+    --
+    + upload_file(): Response
+    + get_current_document(): dict
+    + get_embedding_service(): EmbeddingService
+  }
+
+  class DocumentRoutes {
+    + summarize(): Response
+    + status(): Response
+  }
+
+  class QARoutes {
+    + ask_question(): Response
+  }
+}
+
+package "External Dependencies" {
+  class "FAISS Index" as FAISS {
+    + search(query_vector, k): indices
+    + add(vectors): void
+  }
+
+  class "Google Generative AI" as GoogleAI {
+    + GenerativeModel
+    + embed_content()
+    + generate_content()
+  }
+}
+
+' Relationships
+AIService --> GoogleAI : uses
+EmbeddingService --> FAISS : manages
+EmbeddingService --> AIService : uses for embeddings
+
+UploadRoutes --> DocumentProcessor : uses
+UploadRoutes --> EmbeddingService : uses
+UploadRoutes --> FileValidator : uses
+UploadRoutes --> Config : uses
+
+DocumentRoutes --> AIService : uses
+DocumentRoutes --> UploadRoutes : accesses document
+
+QARoutes --> AIService : uses
+QARoutes --> EmbeddingService : uses
+QARoutes --> FileValidator : uses
+QARoutes --> UploadRoutes : accesses document
+
+DocumentProcessor --> Config : reads settings
+AIService --> Config : reads settings
+FileValidator --> Config : reads settings
+
+note right of Config
+  Centralized configuration
+  Environment variables
+  Singleton pattern
+end note
+
+note right of AIService
+  Singleton pattern
+  Lazy initialization
+  Handles API quotas
+end note
+
+note right of EmbeddingService
+  Manages vector store
+  FAISS persistence
+  Similarity search
+end note
+
+@enduml

@@ -1,0 +1,126 @@
+
+@startuml Component Diagram
+!theme plain
+
+package "Frontend Layer" {
+  component [index.html] as HTML
+  component [app.js] as JS
+  component [style.css] as CSS
+  
+  HTML --> JS : uses
+  HTML --> CSS : uses
+  
+  note right of HTML
+    User Interface
+    - File upload area
+    - Summary display
+    - Q&A interface
+  end note
+}
+
+package "Backend - Flask Application" {
+  component [app.py] as App
+  
+  package "Routes Layer" {
+    component [upload_routes.py] as Upload
+    component [document_routes.py] as DocRoutes
+    component [qa_routes.py] as QARoutes
+    
+    note right of Upload
+      POST /upload
+      Manages current_document
+    end note
+    
+    note right of DocRoutes
+      POST /summarize
+      GET /status
+    end note
+    
+    note right of QARoutes
+      POST /ask
+    end note
+  }
+  
+  package "Modules Layer" {
+    component [config.py] as Config
+    component [document_processor.py] as DocProc
+    component [ai_service.py] as AIServ
+    component [embedding_service.py] as EmbedServ
+    
+    note right of Config
+      Singleton configuration
+      Environment variables
+    end note
+    
+    note right of AIServ
+      Singleton AI service
+      Google Generative AI
+    end note
+  }
+  
+  package "Utils Layer" {
+    component [validators.py] as Validators
+  }
+  
+  App --> Upload : registers
+  App --> DocRoutes : registers
+  App --> QARoutes : registers
+  App --> Config : initializes
+  App --> AIServ : initializes
+  
+  Upload --> DocProc : uses
+  Upload --> EmbedServ : uses
+  Upload --> Validators : uses
+  Upload --> Config : reads
+  
+  DocRoutes --> AIServ : uses
+  DocRoutes --> Upload : accesses document
+  
+  QARoutes --> AIServ : uses
+  QARoutes --> EmbedServ : uses
+  QARoutes --> Validators : uses
+  QARoutes --> Upload : accesses document
+  
+  DocProc --> Config : reads
+  AIServ --> Config : reads
+  Validators --> Config : reads
+  EmbedServ --> AIServ : uses
+}
+
+package "External Services" {
+  component [Google AI API] as GoogleAI
+  database [FAISS Vector Store] as FAISS
+  
+  note right of GoogleAI
+    - Gemini 2.5 Flash
+    - text-embedding-004
+  end note
+}
+
+package "File System" {
+  folder "data/uploads" as Uploads
+  folder "data/faiss_indexes" as FAISSStore
+  
+  note right of FAISSStore
+    - index.faiss
+    - chunks.pkl
+  end note
+}
+
+JS -down-> Upload : HTTP POST/GET
+JS -down-> DocRoutes : HTTP POST/GET
+JS -down-> QARoutes : HTTP POST
+
+AIServ -right-> GoogleAI : API calls
+EmbedServ -right-> FAISS : manages
+EmbedServ -down-> FAISSStore : persists
+
+Upload -down-> Uploads : saves files
+
+interface "REST API" as REST
+JS -down- REST
+REST -down- Upload
+REST -down- DocRoutes
+REST -down- QARoutes
+
+@enduml

@@ -1,0 +1,118 @@
+
+@startuml Document Upload Sequence
+!theme plain
+
+actor User
+participant "Frontend\n(app.js)" as Frontend
+participant "Upload Route" as Upload
+participant "FileValidator" as Validator
+participant "DocumentProcessor" as Processor
+participant "EmbeddingService" as Embedding
+participant "AIService" as AI
+participant "FAISS Index" as FAISS
+database "File System" as FS
+
+User -> Frontend: Select file (PDF/DOCX)
+activate Frontend
+
+Frontend -> Frontend: Validate file type\n(client-side)
+
+User -> Frontend: Click "Upload & Process"
+Frontend -> Upload: POST /upload\n(multipart/form-data)
+activate Upload
+
+Upload -> Validator: allowed_file(filename)
+activate Validator
+Validator --> Upload: true/false
+deactivate Validator
+
+alt Invalid file type
+  Upload --> Frontend: 400 Error
+  Frontend --> User: Show error message
+else Valid file type
+  Upload -> FS: save_file(secure_filename)
+  activate FS
+  FS --> Upload: file_path
+  deactivate FS
+
+  Upload -> Processor: extract_text(file_path, extension)
+  activate Processor
+  
+  alt PDF file
+    Processor -> Processor: extract_text_from_pdf()
+  else DOCX file
+    Processor -> Processor: extract_text_from_docx()
+  end
+  
+  Processor --> Upload: extracted_text
+  deactivate Processor
+
+  Upload -> Validator: validate_text_content(text)
+  activate Validator
+  Validator --> Upload: true/raises ValueError
+  deactivate Validator
+
+  Upload -> Processor: chunk_text(text, 800)
+  activate Processor
+  Processor -> Processor: Split into 800-word chunks
+  Processor --> Upload: chunks[]
+  deactivate Processor
+
+  Upload -> Validator: validate_chunks(chunks)
+  activate Validator
+  Validator --> Upload: true/raises ValueError
+  deactivate Validator
+
+  Upload -> Embedding: create_faiss_index(chunks)
+  activate Embedding
+  
+  loop For each chunk
+    Embedding -> AI: generate_embedding(chunk)
+    activate AI
+    AI -> "Google AI API": embed_content()
+    "Google AI API" --> AI: embedding_vector
+    AI --> Embedding: embedding[]
+    deactivate AI
+    
+    note right of Embedding
+      Progress logged every 10 chunks
+      ~1-2 seconds per chunk
+    end note
+  end
+  
+  Embedding -> Embedding: Convert to numpy array
+  Embedding -> FAISS: create IndexFlatL2
+  activate FAISS
+  Embedding -> FAISS: add(embeddings)
+  FAISS --> Embedding: index created
+  deactivate FAISS
+  
+  Embedding -> FS: save index.faiss\nsave chunks.pkl
+  activate FS
+  FS --> Embedding: saved
+  deactivate FS
+  
+  Embedding --> Upload: faiss_index
+  deactivate Embedding
+
+  Upload -> Upload: Update current_document
+  
+  Upload --> Frontend: 200 Success\n{filename, chunks, words}
+  deactivate Upload
+  
+  Frontend -> Frontend: Show summary section\nDisplay file info
+  Frontend --> User: Success message
+end
+
+deactivate Frontend
+
+note over User, FAISS
+  Upload process takes time due to:
+  1. Text extraction (seconds)
+  2. Embedding generation (1-2s per chunk)
+  3. FAISS index creation (fast)
+  
+  Total time: ~10-60 seconds depending on document size
+end note
+
+@enduml

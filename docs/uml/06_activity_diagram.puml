@@ -1,0 +1,135 @@
+
+@startuml Activity Diagram - Complete Workflow
+!theme plain
+
+|User|
+start
+:Open application;
+
+|Frontend|
+:Load index.html;
+:Check document status\nGET /status;
+
+|Backend|
+:Return document state;
+
+|Frontend|
+if (Document already loaded?) then (yes)
+  :Show summary section;
+else (no)
+  :Hide summary section;
+endif
+
+|User|
+:Select PDF/DOCX file;
+
+|Frontend|
+:Validate file type\n(client-side);
+
+if (Valid file type?) then (no)
+  :Show error message;
+  stop
+else (yes)
+endif
+
+|User|
+:Click "Upload & Process";
+
+|Frontend|
+:Show upload loader;
+:POST /upload with file;
+
+|Backend - Upload Route|
+:Receive file;
+:Validate file extension;
+:Save with secure filename;
+
+|Backend - DocumentProcessor|
+partition "Text Extraction" {
+  if (PDF file?) then (yes)
+    :Extract with pdfplumber;
+  else (DOCX)
+    :Extract with python-docx;
+  endif
+  :Validate text not empty;
+}
+
+partition "Text Chunking" {
+  :Split into 800-word chunks;
+  :Validate chunks created;
+}
+
+|Backend - EmbeddingService|
+partition "Embedding Generation" #LightBlue {
+  repeat
+    :Generate embedding\nfor chunk;
+    :Call Google AI API;
+  repeat while (More chunks?) is (yes)
+  ->no;
+}
+
+partition "FAISS Index" #LightGreen {
+  :Convert embeddings to numpy;
+  :Create IndexFlatL2;
+  :Add vectors to index;
+  :Save index to disk;
+}
+
+|Backend - Upload Route|
+:Update current_document;
+:Return success response;
+
+|Frontend|
+:Hide loader;
+:Show summary section;
+:Display file metadata;
+
+|User|
+fork
+  :Click "Generate Summary";
+  |Frontend|
+  :POST /summarize;
+  |Backend - AIService|
+  :Truncate text if needed;
+  :Generate prompt;
+  :Call Gemini 2.5 Flash;
+  :Return summary;
+  |Frontend|
+  :Display summary;
+fork again
+  :Type question;
+  :Click "Ask Question";
+  |Frontend|
+  :POST /ask {question};
+  |Backend - EmbeddingService|
+  :Generate question embedding;
+  :Search FAISS index;
+  :Retrieve top 5 chunks;
+  |Backend - AIService|
+  :Concatenate chunks;
+  :Generate prompt with context;
+  :Call Gemini 2.5 Flash;
+  :Return answer;
+  |Frontend|
+  :Display Q&A item;
+  |User|
+  if (More questions?) then (yes)
+    :Type another question;
+  else (no)
+  endif
+end fork
+
+stop
+
+note right of "Embedding Generation"
+  Bottleneck: 1-2 seconds per chunk
+  Progress logged every 10 chunks
+end note
+
+note right of "FAISS Index"
+  Fast similarity search
+  L2 distance metric
+  Persistent storage
+end note
+
+@enduml

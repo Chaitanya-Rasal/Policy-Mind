@@ -1,0 +1,116 @@
+
+@startuml State Diagram - Document Processing
+!theme plain
+
+[*] --> NoDocument : Application Start
+
+state NoDocument {
+  NoDocument : No document loaded
+  NoDocument : Summary section hidden
+  NoDocument : Q&A disabled
+}
+
+NoDocument --> Uploading : User selects file\nand clicks upload
+
+state Uploading {
+  Uploading : File validation
+  Uploading : Text extraction
+  Uploading : Showing loader
+}
+
+Uploading --> ProcessingChunks : Text extracted\nsuccessfully
+
+state ProcessingChunks {
+  ProcessingChunks : Creating 800-word chunks
+  ProcessingChunks : Validating chunks
+}
+
+ProcessingChunks --> GeneratingEmbeddings : Chunks created
+
+state GeneratingEmbeddings {
+  GeneratingEmbeddings : Calling Google AI API
+  GeneratingEmbeddings : Processing each chunk
+  GeneratingEmbeddings : Logging progress
+  
+  note right
+    Bottleneck state
+    1-2 seconds per chunk
+    Can fail due to quota
+  end note
+}
+
+GeneratingEmbeddings --> BuildingIndex : Embeddings complete
+
+state BuildingIndex {
+  BuildingIndex : Creating FAISS IndexFlatL2
+  BuildingIndex : Adding vectors
+  BuildingIndex : Saving to disk
+}
+
+BuildingIndex --> DocumentReady : Index built
+
+state DocumentReady {
+  DocumentReady : Document loaded
+  DocumentReady : Summary section visible
+  DocumentReady : Q&A enabled
+  DocumentReady : FAISS index ready
+  --
+  state SummaryIdle
+  state GeneratingSummary
+  state SummaryReady
+  
+  [*] --> SummaryIdle
+  SummaryIdle --> GeneratingSummary : User clicks\n"Generate Summary"
+  GeneratingSummary --> SummaryReady : Summary generated
+  GeneratingSummary --> SummaryIdle : Error occurred
+  
+  note right of GeneratingSummary
+    Calls Gemini 2.5 Flash
+    2-5 seconds typically
+    Subject to rate limits
+  end note
+}
+
+state "Answering Questions" as Answering {
+  state QAIdle
+  state SearchingChunks
+  state GeneratingAnswer
+  state AnswerReady
+  
+  [*] --> QAIdle
+  QAIdle --> SearchingChunks : User submits question
+  SearchingChunks --> GeneratingAnswer : Top 5 chunks retrieved
+  GeneratingAnswer --> AnswerReady : Answer generated
+  AnswerReady --> QAIdle : Ready for next question
+  SearchingChunks --> QAIdle : Error occurred
+  GeneratingAnswer --> QAIdle : Error occurred
+  
+  note right of SearchingChunks
+    FAISS similarity search
+    L2 distance metric
+    Fast (< 100ms)
+  end note
+  
+  note right of GeneratingAnswer
+    Calls Gemini with context
+    2-4 seconds typically
+  end note
+}
+
+DocumentReady --> Answering : Concurrent state
+
+Uploading --> NoDocument : Upload failed\n(validation/extraction error)
+ProcessingChunks --> NoDocument : Chunking failed
+GeneratingEmbeddings --> NoDocument : API quota exceeded\nor other error
+BuildingIndex --> NoDocument : Index creation failed
+
+DocumentReady --> NoDocument : User uploads\nnew document
+
+NoDocument --> [*] : Application closed
+
+note right of NoDocument
+  Initial state and
+  error recovery state
+end note
+
+@enduml

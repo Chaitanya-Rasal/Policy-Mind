@@ -1,0 +1,91 @@
+
+@startuml Summary Generation Sequence
+!theme plain
+
+actor User
+participant "Frontend\n(app.js)" as Frontend
+participant "Document Route" as DocRoute
+participant "AIService" as AI
+participant "current_document" as Doc
+database "Google Gemini API" as Gemini
+
+User -> Frontend: Click "Generate Summary"
+activate Frontend
+
+Frontend -> Frontend: Show loading indicator
+Frontend -> DocRoute: POST /summarize
+activate DocRoute
+
+DocRoute -> DocRoute: get_current_document()
+DocRoute -> Doc: Check document loaded
+activate Doc
+Doc --> DocRoute: {text, filename}
+deactivate Doc
+
+alt No document uploaded
+  DocRoute --> Frontend: 400 Error\n"No document uploaded"
+  Frontend --> User: Error message
+else Document exists
+  DocRoute -> AI: is_initialized()
+  activate AI
+  AI --> DocRoute: true/false
+  
+  alt AI not initialized
+    DocRoute --> Frontend: 500 Error\n"AI Service not initialized"
+    Frontend --> User: API key error
+  else AI initialized
+    DocRoute -> AI: generate_summary(text)
+    
+    AI -> AI: Truncate text\nif > 15,000 chars
+    
+    note right of AI
+      Prompt includes:
+      - Role definition
+      - Task instructions
+      - Document context
+    end note
+    
+    AI -> Gemini: generate_content(prompt)
+    activate Gemini
+    
+    Gemini -> Gemini: Process with\nGemini 2.5 Flash
+    
+    alt Success
+      Gemini --> AI: summary_text
+      deactivate Gemini
+      
+      AI --> DocRoute: summary
+      deactivate AI
+      
+      DocRoute --> Frontend: 200 Success\n{summary, document}
+      deactivate DocRoute
+      
+      Frontend -> Frontend: Display summary
+      Frontend -> Frontend: Hide loading
+      Frontend --> User: Show summary
+    else API Quota Exceeded
+      Gemini --> AI: 429 Error
+      AI -> AI: Detect quota error
+      AI --> DocRoute: Exception\n"API quota exceeded"
+      DocRoute --> Frontend: 500 Error
+      Frontend --> User: Rate limit message
+    else Other Error
+      Gemini --> AI: Error
+      AI --> DocRoute: Exception
+      DocRoute --> Frontend: 500 Error
+      Frontend --> User: Generic error
+    end
+  end
+end
+
+deactivate Frontend
+
+note over User, Gemini
+  Summary generation is:
+  - Optional (user-triggered)
+  - Fast (~2-5 seconds)
+  - Subject to API rate limits
+  - Optimized for legal documents
+end note
+
+@enduml
